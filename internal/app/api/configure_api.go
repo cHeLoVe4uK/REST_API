@@ -27,7 +27,7 @@ func (api *API) configureLoggerField() error {
 }
 
 // Конфигурируем роутер нашего сервера
-func (api *API) configRouterField() {
+func (api *API) configureRouterField() {
 	router := gin.Default()
 	guideGroup := router.Group("/guide")
 	guideGroup.GET("/:iata", api.GetGuideByIATA)
@@ -57,11 +57,11 @@ func (api *API) configureStorageField() error {
 
 // Конфигурируем сторонний API для получения информации о странах
 func (api *API) configureCountryAPIField() {
-	outsideAPI := api.config.OutsideAPI
+	externalAPI := api.config.ExternalAPI
 
 	creds := client.Credentials{
-		ApiKeyValue:    outsideAPI.ApiKeyValue,
-		SecretKeyValue: outsideAPI.SecretKeyValue,
+		ApiKeyValue:    externalAPI.ApiKeyValue,
+		SecretKeyValue: externalAPI.SecretKeyValue,
 	}
 
 	ap := dadata.NewSuggestApi(client.WithCredentialProvider(&creds))
@@ -76,15 +76,13 @@ func (api *API) configureCacheField() {
 
 // Конфигурируем Редис Кэш для нашего сервера
 func (api *API) configureRedisClientField() {
-	api.redisClient = red.NewRedClient(api.config.Redis)
+	api.redisClient = red.NewRedisClient(api.config.Redis)
 }
 
-// Конфигурируем поле srv для нашего сервера
-func (api *API) configureSrvField() *http.Server {
-	api.srv = &http.Server{
+// Конфигурируем поле server для нашего сервера
+func (api *API) configureServerField() {
+	api.server = &http.Server{
 		Addr:    ":" + api.config.BindAddr,
 		Handler: api.router.Handler(),
 	}
-
-	return api.srv
 }

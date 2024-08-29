@@ -3,9 +3,8 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"log"
-	"net/http"
+	"log/slog"
 	"os"
 	"os/signal"
 	"restapi/internal/app/api"
@@ -28,19 +27,17 @@ func main() {
 	// Создаем конфиги и парсим в них значения из конфигурационного файла
 	apiConfig, err := config.AllApiConfig(&configPathAPI)
 	if err != nil {
-		fmt.Println(err)
+		slog.Error("Configure file not found, server will not be started:", err)
 	}
 
 	// Создаем сервер
 	server := api.New(apiConfig)
 
 	// Стартуем сервер
-	// Делаем это в отдельной горутине для возможности отловить сигналы завершения приложения далее
-	go func() {
-		if err := server.Start(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Ошибка: %s\n", err)
-		}
-	}()
+	err = server.Start()
+	if err != nil {
+		slog.Error("Server will not be started:", err)
+	}
 
 	// Создаем канал для отлавливания сигнала ОС или пользователя
 	quit := make(chan os.Signal, 1)
@@ -64,12 +61,12 @@ func main() {
 
 	// 2 версия завершения сервера основанная на атомарном счетчике (куда практичнее, потому что ведется учет выполнения обработчиков http запросов)
 	// Как только сигнал получен начинаем плавное завершение сервера
-	log.Println("Завершение работы сервера...")
+	log.Println("Server shutting down...")
 	ctx := context.Background()
 	// Если при завершении работы сервера произошла ошибка
-	if err := server.GetSrv().Shutdown(ctx); err != nil {
-		log.Fatal("Сервер завершил работу неккоректно:", err)
+	if err := server.GetServer().Shutdown(ctx); err != nil {
+		log.Fatal("Server shut down uncorrected:", err)
 	}
 	server.Wait()
-	log.Println("Время вышло, сервер завершил работу успешно")
+	log.Println("Server successfully shut down")
 }

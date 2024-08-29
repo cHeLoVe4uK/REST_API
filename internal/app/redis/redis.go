@@ -1,34 +1,35 @@
-package red
+package redis
 
 import (
 	"context"
 	"restapi/internal/app/config"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 )
 
-type RedClient struct {
+type RedisClient struct {
 	client *redis.Client
 }
 
-func NewRedClient(config *config.RedisConfig) *RedClient {
+func NewRedisClient(config *config.RedisConfig) *RedisClient {
 	cl := redis.NewClient(&redis.Options{
 		Addr:     config.Addr,
 		Password: config.Password,
 		DB:       0,
 	})
 
-	client := &RedClient{
+	client := &RedisClient{
 		client: cl,
 	}
 
 	return client
 }
 
-func (client *RedClient) SetValue(key string, value string) error {
+func (client *RedisClient) SetValue(key string, value string) error {
 	ctx := context.Background()
 
-	err := client.client.Set(ctx, key, value, 0).Err()
+	err := client.client.Set(ctx, key, value, time.Hour).Err()
 	if err != nil {
 		return err
 	}
@@ -36,7 +37,7 @@ func (client *RedClient) SetValue(key string, value string) error {
 	return nil
 }
 
-func (client *RedClient) GetValue(key string) (string, error) {
+func (client *RedisClient) GetValue(key string) (string, error) {
 	ctx := context.Background()
 
 	val, err := client.client.Get(ctx, key).Result()
