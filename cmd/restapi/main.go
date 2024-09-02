@@ -27,7 +27,7 @@ func main() {
 	// Создаем конфиги и парсим в них значения из конфигурационного файла
 	apiConfig, err := config.AllApiConfig(&configPathAPI)
 	if err != nil {
-		slog.Error("Configure file not found, server will not be started:", err)
+		slog.Error("Configure file not found, server will not be started:", " ", err)
 	}
 
 	// Создаем сервер
@@ -36,7 +36,7 @@ func main() {
 	// Стартуем сервер
 	err = server.Start()
 	if err != nil {
-		slog.Error("Server will not be started:", err)
+		slog.Error("Server will not be started:", " ", err)
 	}
 
 	// Создаем канал для отлавливания сигнала ОС или пользователя
