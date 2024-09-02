@@ -81,7 +81,7 @@ func (api *API) Start() error {
 	api.logger.Info("Gorutine for removing cache's outdated items succsessfully started")
 
 	// Сигнал о том, что настройка прошла успешно и запуск нашего сервера
-	api.logger.Info("Starting on port:", api.config.BindAddr)
+	api.logger.Info("Starting on port:", " ", api.config.BindAddr)
 
 	// Запускаем сервер в отдельной горутине для возможности отловить сигналы завершения приложения
 	go func() {

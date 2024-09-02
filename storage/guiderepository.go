@@ -18,7 +18,7 @@ func (guide *GuideRepository) GetGuideByIATA(iata string) (*models.Guide, bool, 
 
 	guides, err := guide.GetAllGuides()
 	if err != nil {
-		log.Println("При вызове метода получения гайда по IATA произошла ошибка:", err)
+		log.Println("An error occurred when calling the method GetGuideByIATA")
 		return nil, founded, err
 	}
 
@@ -36,11 +36,11 @@ func (guide *GuideRepository) GetGuideByIATA(iata string) (*models.Guide, bool, 
 
 // Метод для добавления гайда по стране с помощью ее IATA по стандарту ISO3166
 func (guide *GuideRepository) CreateGuide(g *models.Guide) (*models.Guide, error) {
-	query := fmt.Sprintf("INSERT INTO %s (iata, title, author, content) VALUES ($1, $2, $3, $4) RETURNING iata", guide.storage.config.TableName)
+	query := fmt.Sprintf("INSERT INTO %s (iata, title, author, content) VALUES ($1, $2, $3, $4)", guide.storage.config.TableName)
 
-	err := guide.storage.db.QueryRow(query, strings.ToUpper(g.IATA), g.Title, g.Author, g.Content).Scan(&g.IATA)
+	_, err := guide.storage.db.Exec(query, strings.ToUpper(g.IATA), g.Title, g.Author, g.Content)
 	if err != nil {
-		log.Println("При вызове метода создания гайда произошла ошибка:", err)
+		log.Println("An error occurred when calling the method CreateGuide")
 		return nil, err
 	}
 
@@ -49,11 +49,11 @@ func (guide *GuideRepository) CreateGuide(g *models.Guide) (*models.Guide, error
 
 // Метод для обновления гайда по стране с помощью ее IATA по стандарту ISO3166
 func (guide *GuideRepository) UpdateGuideByIATA(g *models.Guide) (*models.Guide, error) {
-	query := fmt.Sprintf("UPDATE %s SET title=$1, author=$2, content=$3 WHERE iata=$4 RETURNING iata", guide.storage.config.TableName)
+	query := fmt.Sprintf("UPDATE %s SET title=$1, author=$2, content=$3 WHERE iata=$4", guide.storage.config.TableName)
 
-	err := guide.storage.db.QueryRow(query, g.Title, g.Author, g.Content, strings.ToUpper(g.IATA)).Scan(&g.IATA)
+	_, err := guide.storage.db.Exec(query, g.Title, g.Author, g.Content, strings.ToUpper(g.IATA))
 	if err != nil {
-		log.Println("При вызове метода обновления гайда произошла ошибка:", err)
+		log.Println("An error occurred when calling the method UpdateGuideByIATA")
 		return nil, err
 	}
 
@@ -70,7 +70,7 @@ func (guide *GuideRepository) DeleteGuideByIATA(iata string) (*models.Guide, err
 		query := fmt.Sprintf("DELETE FROM %s WHERE iata=$1", guide.storage.config.TableName)
 		_, err := guide.storage.db.Exec(query, iata)
 		if err != nil {
-			log.Println("При вызове метода удаления гайда произошла ошибка:", err)
+			log.Println("An error occurred when calling the method DeleteGuideByIATA")
 			return nil, err
 		}
 	}
@@ -84,7 +84,7 @@ func (guide *GuideRepository) GetAllGuides() ([]*models.Guide, error) {
 
 	rows, err := guide.storage.db.Query(query)
 	if err != nil {
-		log.Println("При вызове метода получения всех гайдов произошла ошибка:", err)
+		log.Println("An error occurred when calling the method GetAllGuides")
 		return nil, err
 	}
 	defer rows.Close()

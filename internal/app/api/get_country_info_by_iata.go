@@ -2,7 +2,6 @@ package api
 
 import (
 	"net/http"
-	"restapi/internal/app/models"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -13,7 +12,7 @@ func (a *API) GetCountryInfoByIATA(c *gin.Context) {
 	// Каждый обработчик работает с атомарным счетчиком, по которому мы отследим что все они завершились
 	a.Add(1)
 	defer a.Done()
-	a.logger.Info("Пользователь выполняет 'GET: GetCountryInfoByIATA /info/:iata'")
+	a.logger.Info("User do 'GET: GetCountryInfoByIATA /info/:iata'")
 
 	// Считываем значение IATA, проверка что это не число и приведение к прописному виду в случае успеха
 	iata := c.Params.ByName("iata")
@@ -26,34 +25,33 @@ func (a *API) GetCountryInfoByIATA(c *gin.Context) {
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Проверяем есть ли у нас в Кэше редиса элемент с таким IATA
-	a.logger.Info("Поиск информация о стране в кэше редиса")
+	a.logger.Info("Searching info about country in Redis")
 	val, err := a.redisClient.GetValue(iataUP)
 	if err != nil {
-		a.logger.Info("При получении информации о стране из кэша редиса произошла ошибка")
+		a.logger.Error("An error occurred when recieving info about country from Redis:", " ", err)
 	} else {
-		a.logger.Info("Информация о стране была найдена в кэше редиса")
-		a.logger.Info("Поиск гайда в кэше")
+		a.logger.Info("Country info was found in Redis")
+		a.logger.Info("Searching guide in Cache")
 		// Проверяем гайд в кэше
 		g, ok := a.cache.Get(iataUP)
 		if ok {
-			guideSlice := make([]*models.Guide, 0, 1)
-			Message := Message{
+			Message := RequestMessage{
 				Message:     "Запрос на получение информации о стране и получение гайда выполнен успешно",
-				Guide:       append(guideSlice, g),
+				Guide:       g,
 				CountryInfo: val,
 			}
 			c.JSON(http.StatusOK, Message)
-			a.logger.Info("Гайд был найден в кэше при получении информации о стране")
-			a.logger.Info("Запрос 'GET: GetCountryInfoByIATA /info/:iata' успешно выполнен")
+			a.logger.Info("Guide was found in Cache when calling GetCountryInfoByIATA")
+			a.logger.Info("Request 'GET: GetCountryInfoByIATA /info/:iata' successfully done")
 			return
 		}
-		a.logger.Info("Гайд в кэше не был найден")
+		a.logger.Info("Guide was not found in Cache")
 
 		// Ищем гайд в БД
 		guide, ok, err := a.storage.Guide().GetGuideByIATA(iataUP)
 		if err != nil {
-			a.logger.Info("Проблемы c подключением к БД (таблица guides)")
-			Message := Message{
+			a.logger.Error("Trouble with connecting to DB (table guides):", " ", err)
+			Message := RequestMessage{
 				Message: "Извините, возникли проблемы с доступом к базе данных",
 			}
 			c.JSON(http.StatusInternalServerError, Message)
@@ -61,8 +59,8 @@ func (a *API) GetCountryInfoByIATA(c *gin.Context) {
 		}
 		// Если гайд не был найден
 		if !ok {
-			a.logger.Info("Гайд с таким IATA в базе данных не найден")
-			Message := Message{
+			a.logger.Info("Guide with this IATA not found in DB:", " ", iataUP)
+			Message := RequestMessage{
 				Message:     "Гайда с таким IATA не существует",
 				CountryInfo: val,
 			}
@@ -71,17 +69,16 @@ func (a *API) GetCountryInfoByIATA(c *gin.Context) {
 		}
 
 		// Если информация о стране была успешно получена и был найден гайд
-		guideSlice := make([]*models.Guide, 0, 1)
-		Message := Message{
+		Message := RequestMessage{
 			Message:     "Запрос на получение информации о стране и получение гайда выполнен успешно",
-			Guide:       append(guideSlice, guide),
+			Guide:       guide,
 			CountryInfo: val,
 		}
 		c.JSON(http.StatusOK, Message)
-		a.logger.Info("Запрос 'GET: GetCountryInfoByIATA /info/:iata' успешно выполнен")
+		a.logger.Info("Request 'GET: GetCountryInfoByIATA /info/:iata' successfully done")
 		return
 	}
-	a.logger.Info("Информация о стране не найдена в кэше редиса")
+	a.logger.Info("Country info not found in Redis")
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -89,8 +86,8 @@ func (a *API) GetCountryInfoByIATA(c *gin.Context) {
 	// Проверяем что страна с таким IATA существует
 	suggestions, err := a.GetCountryByIATA(iataUP)
 	if err != nil {
-		a.logger.Info("При получении информации о стране по ее IATA произошла ошибка")
-		Message := Message{
+		a.logger.Error("An error occurred when calling GetCountryByIATA:", " ", err)
+		Message := RequestMessage{
 			Message: "Извините, в данный момент эта функция недоступна. Попробуйте позже",
 		}
 		c.JSON(http.StatusInternalServerError, Message)
@@ -98,8 +95,8 @@ func (a *API) GetCountryInfoByIATA(c *gin.Context) {
 	}
 	// Если все прошло хорошо, но никакой информации о стране не было получено
 	if len(suggestions) == 0 {
-		a.logger.Info("При получение информации о стране пользователь указал несуществующий IATA")
-		Message := Message{
+		a.logger.Info("User provided non existed IATA in PostGuideByIATA")
+		Message := RequestMessage{
 			Message: "Вы указали несуществующий IATA",
 		}
 		c.JSON(http.StatusBadRequest, Message)
@@ -107,7 +104,7 @@ func (a *API) GetCountryInfoByIATA(c *gin.Context) {
 	}
 
 	// Если информация о стране была успешно получена
-	a.logger.Info("Информация о стране была успешно получена с сервиса DaData")
+	a.logger.Info("Country info successfully recieved from DaData")
 	var countryName string
 	for _, s := range suggestions {
 		countryName = s.Value
@@ -116,32 +113,31 @@ func (a *API) GetCountryInfoByIATA(c *gin.Context) {
 	// Дбавляем элемент в Кэш редиса по его IATA
 	err = a.redisClient.SetValue(iataUP, countryName)
 	if err != nil {
-		a.logger.Info("При попытке добавить элемент в кэш редиса произошла ошибка")
+		a.logger.Error("An error occurred when adding Country info in Redis", " ", err)
 	}
-	a.logger.Info("Информация о стране добавлена в кэш редиса")
+	a.logger.Info("Country info was added to Redis")
 
 	// Проверяем гайд в кэше
-	a.logger.Info("Поиск гайда в кэше")
+	a.logger.Info("Searching guide in Cache")
 	g, ok := a.cache.Get(iataUP)
 	if ok {
-		guideSlice := make([]*models.Guide, 0, 1)
-		Message := Message{
+		Message := RequestMessage{
 			Message:     "Запрос на получение информации о стране и получение гайда выполнен успешно",
-			Guide:       append(guideSlice, g),
+			Guide:       g,
 			CountryInfo: countryName,
 		}
 		c.JSON(http.StatusOK, Message)
-		a.logger.Info("Гайд был найден в кэше при получении информации о стране")
-		a.logger.Info("Запрос 'GET: GetCountryInfoByIATA /info/:iata' успешно выполнен")
+		a.logger.Info("Guide was found in Cache when calling GetCountryInfoByIATA")
+		a.logger.Info("Request 'GET: GetCountryInfoByIATA /info/:iata' successfully done")
 		return
 	}
-	a.logger.Info("Гайд в кэше не был найден")
+	a.logger.Info("Guide was not found in Cache")
 
 	// Ищем гайд в БД
 	guide, ok, err := a.storage.Guide().GetGuideByIATA(iataUP)
 	if err != nil {
-		a.logger.Info("Проблемы c подключением к БД (таблица guides)")
-		Message := Message{
+		a.logger.Error("Trouble with connecting to DB (table guides):", " ", err)
+		Message := RequestMessage{
 			Message: "Извините, возникли проблемы с доступом к базе данных",
 		}
 		c.JSON(http.StatusInternalServerError, Message)
@@ -149,8 +145,8 @@ func (a *API) GetCountryInfoByIATA(c *gin.Context) {
 	}
 	// Если гайд не был найден
 	if !ok {
-		a.logger.Info("Гайд с таким IATA в базе данных не найден")
-		Message := Message{
+		a.logger.Info("Guide with this IATA not found in DB:", " ", iataUP)
+		Message := RequestMessage{
 			Message:     "Гайда с таким IATA не существует",
 			CountryInfo: countryName,
 		}
@@ -159,13 +155,12 @@ func (a *API) GetCountryInfoByIATA(c *gin.Context) {
 	}
 
 	// Если информация о стране была успешно получена и был найден гайд
-	guideSlice := make([]*models.Guide, 0, 1)
-	Message := Message{
+	Message := RequestMessage{
 		Message:     "Запрос на получение информации о стране и получение гайда выполнен успешно",
-		Guide:       append(guideSlice, guide),
+		Guide:       guide,
 		CountryInfo: countryName,
 	}
 	c.JSON(http.StatusOK, Message)
 
-	a.logger.Info("Запрос 'GET: GetCountryInfoByIATA /info/:iata' успешно выполнен")
+	a.logger.Info("Request 'GET: GetCountryInfoByIATA /info/:iata' successfully done")
 }

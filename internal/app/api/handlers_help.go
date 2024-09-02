@@ -8,28 +8,34 @@ import (
 	"github.com/ekomobile/dadata/v2/api/suggest"
 )
 
-// Структура для предоставления информации пользователю
-type Message struct {
-	Message     string          `json:"message"`
-	Guide       []*models.Guide `json:"guide,omitempty"`
-	CountryInfo string          `json:"country_info,omitempty"`
+// Структура для предоставления информации пользователю, где нужен один гайд
+type RequestMessage struct {
+	Message     string        `json:"message"`
+	Guide       *models.Guide `json:"guide,omitempty"`
+	CountryInfo string        `json:"country_info,omitempty"`
+}
+
+// Структура для предоставления информации пользователю, где нужен срез гайдов
+type RequestMessageGuides struct {
+	Message string          `json:"message"`
+	Guides  []*models.Guide `json:"guides,omitempty"`
 }
 
 // Метод (вспомогательный), проверяющий, что пользователь не вводил численные значение IATA (т.к. наше API такого не позволяет)
-func (a *API) NotNumb(numb string) (Message, error) {
+func (a *API) NotNumb(numb string) (RequestMessage, error) {
 	_, err := strconv.Atoi(numb)
 	if err == nil {
-		a.logger.Info("Пользователь попытался выполнить запрос с численным значением IATA")
-		return Message{Message: "Убедитесь в правильности введенного запроса. IATA не может быть числом"}, nil
+		a.logger.Error("User try to use number value of IATA")
+		return RequestMessage{Message: "Убедитесь в правильности введенного запроса. IATA не может быть числом"}, nil
 	}
-	return Message{}, err
+	return RequestMessage{}, err
 }
 
 // Функция для получения информации о стране через наш сторонний API (проверка что IATA введена верно)
 func (a *API) GetCountryByIATA(iata string) ([]*suggest.CountrySuggestion, error) {
 	suggestions, err := a.countryAPI.CountryByID(context.Background(), iata)
 	if err != nil {
-		a.logger.Info("Произошла ошибка при попытке получения информации о стране")
+		a.logger.Error("Error while trying to receive info about country")
 		return nil, err
 	}
 

@@ -2,7 +2,6 @@ package api
 
 import (
 	"net/http"
-	"restapi/internal/app/models"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -13,7 +12,7 @@ func (a *API) GetGuideByIATA(c *gin.Context) {
 	// Каждый обработчик работает с атомарным счетчиком, по которому мы отследим что все они завершились
 	a.Add(1)
 	defer a.Done()
-	a.logger.Info("Пользователь выполняет 'GET: GetGuideByIATA /guide/:iata'")
+	a.logger.Info("User do 'GET: GetGuideByIATA /guide/:iata'")
 
 	// Считываем значение IATA, проверка что это не число и приведение к прописному виду в случае успеха
 	iata := c.Params.ByName("iata")
@@ -25,26 +24,25 @@ func (a *API) GetGuideByIATA(c *gin.Context) {
 	iataUP := strings.ToUpper(iata)
 
 	// Проверяем гайд в кэше
-	a.logger.Info("Поиск гайда в кэше")
+	a.logger.Info("Searching guide in Cache")
 	g, ok := a.cache.Get(iataUP)
 	if ok {
-		guideSlice := make([]*models.Guide, 0, 1)
-		Message := Message{
+		Message := RequestMessage{
 			Message: "Гайд успешно найден",
-			Guide:   append(guideSlice, g),
+			Guide:   g,
 		}
 		c.JSON(http.StatusOK, Message)
-		a.logger.Info("Гайд был найден в кэше")
-		a.logger.Info("Запрос 'GET: GetGuideByIATA /guide/:iata' успешно выполнен")
+		a.logger.Info("Guide was found in Cache")
+		a.logger.Info("Request 'GET: GetGuideByIATA /guide/:iata' successfully done")
 		return
 	}
-	a.logger.Info("Гайд в кэше не найден")
+	a.logger.Info("Guide was not found in Cache")
 
 	// Получаем гайд
 	guide, ok, err := a.storage.Guide().GetGuideByIATA(iataUP)
 	if err != nil {
-		a.logger.Info("Проблемы c подключением к БД (таблица guides)")
-		Message := Message{
+		a.logger.Error("Trouble with connecting to DB (table guides):", " ", err)
+		Message := RequestMessage{
 			Message: "Извините, возникли проблемы с доступом к базе данных",
 		}
 		c.JSON(http.StatusInternalServerError, Message)
@@ -52,8 +50,8 @@ func (a *API) GetGuideByIATA(c *gin.Context) {
 	}
 	// Если гайд не найден
 	if !ok {
-		a.logger.Info("Гайд с таким IATA в базе данных не найден")
-		Message := Message{
+		a.logger.Info("Guide with this IATA not found in DB:", " ", iataUP)
+		Message := RequestMessage{
 			Message: "Гайда с таким IATA не существует",
 		}
 		c.JSON(http.StatusNotFound, Message)
@@ -61,16 +59,15 @@ func (a *API) GetGuideByIATA(c *gin.Context) {
 	}
 
 	// Если все прошло успешно
-	guideSlice := make([]*models.Guide, 0, 1)
-	Message := Message{
+	Message := RequestMessage{
 		Message: "Гайд успешно найден",
-		Guide:   append(guideSlice, guide),
+		Guide:   guide,
 	}
 	c.JSON(http.StatusOK, Message)
 
 	// Добавляем гайд в кэш
-	a.logger.Info("При получении гайда по IATA он был добавлен в кэш")
+	a.logger.Info("Guide was add to Cache while recieve by IATA")
 	a.cache.Set(iataUP, guide)
 
-	a.logger.Info("Запрос 'GET: GetGuideByIATA /guide/:iata' успешно выполнен")
+	a.logger.Info("Request 'GET: GetGuideByIATA /guide/:iata' successfully done")
 }
