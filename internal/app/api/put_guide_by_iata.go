@@ -14,7 +14,7 @@ func (a *API) PutGuideByIATA(c *gin.Context) {
 	// Каждый обработчик работает с атомарным счетчиком, по которому мы отследим что все они завершились
 	a.Add(1)
 	defer a.Done()
-	a.logger.Info("Пользователь выполняет 'PUT: PutGuideByIATA /guide/:iata'")
+	a.logger.Info("User do 'PUT: PutGuideByIATA /guide/:iata'")
 
 	// Считываем значение IATA, проверка что это не число и приведение к прописному виду в случае успеха
 	iata := c.Params.ByName("iata")
@@ -31,8 +31,8 @@ func (a *API) PutGuideByIATA(c *gin.Context) {
 	// Парсим тело запроса
 	err = c.ShouldBindJSON(&guide)
 	if err != nil {
-		a.logger.Info("Пользователь предоставил неккоректный json")
-		Message := Message{
+		a.logger.Info("User provided uncorrected JSON")
+		Message := RequestMessage{
 			Message: "Предоставленные данные имеют неверный формат",
 		}
 		c.JSON(http.StatusBadRequest, Message)
@@ -41,8 +41,8 @@ func (a *API) PutGuideByIATA(c *gin.Context) {
 
 	// Проверяем что IATA в запросе и IATA в теле запроса не отличаются
 	if iataUP != strings.ToUpper(guide.IATA) {
-		a.logger.Info("Данные в запросе не совпадают с данными в json")
-		Message := Message{
+		a.logger.Info("Request IATA and JSON IATA is mismatched")
+		Message := RequestMessage{
 			Message: "IATA в запросе не соответствует IATA в теле запроса",
 		}
 		c.JSON(http.StatusBadRequest, Message)
@@ -52,8 +52,8 @@ func (a *API) PutGuideByIATA(c *gin.Context) {
 	// Если все прошло хорошо переходим к поиску гайда в БД
 	_, ok, err := a.storage.Guide().GetGuideByIATA(iataUP)
 	if err != nil {
-		a.logger.Info("Проблемы c подключением к БД (таблица guides)")
-		Message := Message{
+		a.logger.Error("Trouble with connecting to DB (table guides):", " ", err)
+		Message := RequestMessage{
 			Message: "Извините, возникли проблемы с доступом к базе данных",
 		}
 		c.JSON(http.StatusInternalServerError, Message)
@@ -61,8 +61,8 @@ func (a *API) PutGuideByIATA(c *gin.Context) {
 	}
 	// Если гайд не найден
 	if !ok {
-		a.logger.Info("Пользователь пытается обновить несуществующий гайд")
-		Message := Message{
+		a.logger.Info("User trying to update non existed guide")
+		Message := RequestMessage{
 			Message: "Вы пытаетесь обновить несуществующий гайд",
 		}
 		c.JSON(http.StatusBadRequest, Message)
@@ -72,8 +72,8 @@ func (a *API) PutGuideByIATA(c *gin.Context) {
 	// Только после всего этого переходим непосредственно к обновлению гайда
 	guideFinal, err := a.storage.Guide().UpdateGuideByIATA(&guide)
 	if err != nil {
-		a.logger.Info("Проблемы c подключением к БД (таблица guides)")
-		Message := Message{
+		a.logger.Error("Trouble with connecting to DB (table guides):", " ", err)
+		Message := RequestMessage{
 			Message: "Извините, возникли проблемы с доступом к базе данных",
 		}
 		c.JSON(http.StatusInternalServerError, Message)
@@ -81,15 +81,14 @@ func (a *API) PutGuideByIATA(c *gin.Context) {
 	}
 
 	// Если все прошло хорошо
-	guideSlice := make([]*models.Guide, 0, 1)
-	Message := Message{
+	Message := RequestMessage{
 		Message: fmt.Sprintf("Гайд с идентификатором {IATA: %v} успешно обновлен", guideFinal.IATA),
-		Guide:   append(guideSlice, guideFinal),
+		Guide:   guideFinal,
 	}
 	c.JSON(http.StatusOK, Message)
 
-	a.logger.Info("Инвалидация кэша при обновлении гайда")
+	a.logger.Info("Cache invalidation in PutGuideByIATA")
 	a.cache = a.cache.Delete()
 
-	a.logger.Info("Запрос 'PUT: PutGuideByIATA /guide/:iata' успешно выполнен")
+	a.logger.Info("Request 'PUT: PutGuideByIATA /guide/:iata' successfully done")
 }

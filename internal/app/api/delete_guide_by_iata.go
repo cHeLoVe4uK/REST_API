@@ -3,7 +3,6 @@ package api
 import (
 	"fmt"
 	"net/http"
-	"restapi/internal/app/models"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -14,7 +13,7 @@ func (a *API) DeleteGuideByIATA(c *gin.Context) {
 	// Каждый обработчик работает с атомарным счетчиком, по которому мы отследим что все они завершились
 	a.Add(1)
 	defer a.Done()
-	a.logger.Info("Пользователь выполняет 'DELETE: DeleteGuideByIATA /guide/:iata'")
+	a.logger.Info("User do 'DELETE: DeleteGuideByIATA /guide/:iata'")
 
 	// Считываем значение IATA, проверка что это не число и приведение к прописному виду в случае успеха
 	iata := c.Params.ByName("iata")
@@ -28,8 +27,8 @@ func (a *API) DeleteGuideByIATA(c *gin.Context) {
 	// Ищем гайд в БД
 	_, ok, err := a.storage.Guide().GetGuideByIATA(iataUP)
 	if err != nil {
-		a.logger.Info("Проблемы c подключением к БД (таблица guides)")
-		Message := Message{
+		a.logger.Error("Trouble with connecting to DB (table guides):", " ", err)
+		Message := RequestMessage{
 			Message: "Извините, возникли проблемы с доступом к базе данных",
 		}
 		c.JSON(http.StatusInternalServerError, Message)
@@ -37,8 +36,8 @@ func (a *API) DeleteGuideByIATA(c *gin.Context) {
 	}
 	// Если гайд не найден
 	if !ok {
-		a.logger.Info("Пользователь пытается удалить несуществующий гайд")
-		Message := Message{
+		a.logger.Info("User trying to delete non existed guide")
+		Message := RequestMessage{
 			Message: "Вы пытаетесь удалить несуществующий гайд",
 		}
 		c.JSON(http.StatusBadRequest, Message)
@@ -48,8 +47,8 @@ func (a *API) DeleteGuideByIATA(c *gin.Context) {
 	// Удаляем гайд
 	guideFinal, err := a.storage.Guide().DeleteGuideByIATA(iataUP)
 	if err != nil {
-		a.logger.Info("Проблемы c подключением к БД (таблица guides)")
-		Message := Message{
+		a.logger.Error("Trouble with connecting to DB (table guides):", " ", err)
+		Message := RequestMessage{
 			Message: "Извините, возникли проблемы с доступом к базе данных",
 		}
 		c.JSON(http.StatusInternalServerError, Message)
@@ -57,15 +56,14 @@ func (a *API) DeleteGuideByIATA(c *gin.Context) {
 	}
 
 	// Если все прошло хорошо
-	guideSlice := make([]*models.Guide, 0, 1)
-	Message := Message{
+	Message := RequestMessage{
 		Message: fmt.Sprintf("Гайд с идентификатором {IATA: %v} успешно удален", guideFinal.IATA),
-		Guide:   append(guideSlice, guideFinal),
+		Guide:   guideFinal,
 	}
 	c.JSON(http.StatusOK, Message)
 
-	a.logger.Info("Инвалидация кэша при удалении гайда")
+	a.logger.Info("Cache invalidation in DeleteGuideByIATA")
 	a.cache = a.cache.Delete()
 
-	a.logger.Info("Запрос 'DELETE: DeleteGuideByIATA /guide/:iata' успешно выполнен")
+	a.logger.Info("Request 'DELETE: DeleteGuideByIATA /guide/:iata' successfully done")
 }

@@ -14,7 +14,7 @@ func (a *API) PostGuideByIATA(c *gin.Context) {
 	// Каждый обработчик работает с атомарным счетчиком, по которому мы отследим что все они завершились
 	a.Add(1)
 	defer a.Done()
-	a.logger.Info("Пользователь выполняет 'POST: PostGuideByIATA /guide/:iata'")
+	a.logger.Info("User do 'POST: PostGuideByIATA /guide/:iata'")
 
 	// Считываем значение IATA, проверка что это не число и приведение к прописному виду в случае успеха
 	iata := c.Params.ByName("iata")
@@ -31,8 +31,8 @@ func (a *API) PostGuideByIATA(c *gin.Context) {
 	// Парсим тело запроса
 	err = c.ShouldBindJSON(&guide)
 	if err != nil {
-		a.logger.Info("Пользователь предоставил неккоректный json")
-		Message := Message{
+		a.logger.Error("User provided uncorrected JSON")
+		Message := RequestMessage{
 			Message: "Предоставленные данные имеют неверный формат",
 		}
 		c.JSON(http.StatusBadRequest, Message)
@@ -41,8 +41,8 @@ func (a *API) PostGuideByIATA(c *gin.Context) {
 
 	// Проверяем что IATA в запросе и IATA в теле запроса не отличаются
 	if iataUP != strings.ToUpper(guide.IATA) {
-		a.logger.Info("Данные в запросе не совпадают с данными в json")
-		Message := Message{
+		a.logger.Error("Request IATA and JSON IATA is mismatched")
+		Message := RequestMessage{
 			Message: "IATA в запросе не соответствует IATA в теле запроса",
 		}
 		c.JSON(http.StatusBadRequest, Message)
@@ -52,8 +52,8 @@ func (a *API) PostGuideByIATA(c *gin.Context) {
 	// Проверяем что страна с таким IATA существует
 	suggestions, err := a.GetCountryByIATA(iataUP)
 	if err != nil {
-		a.logger.Info("При создании гайда произошла ошибка с проверкой страны по ее IATA")
-		Message := Message{
+		a.logger.Error("An error occurred when creating guide", " ", err)
+		Message := RequestMessage{
 			Message: "Извините, в данный момент эта функция недоступна. Попробуйте позже",
 		}
 		c.JSON(http.StatusInternalServerError, Message)
@@ -62,8 +62,8 @@ func (a *API) PostGuideByIATA(c *gin.Context) {
 
 	// Если все прошло хорошо, но никакой информации о стране не было получено
 	if len(suggestions) == 0 {
-		a.logger.Info("При создании гайда произошла ошибка, пользователь указал несуществующий IATA")
-		Message := Message{
+		a.logger.Error("User provided non existed IATA in PostGuideByIATA")
+		Message := RequestMessage{
 			Message: "Вы указали несуществующий IATA",
 		}
 		c.JSON(http.StatusBadRequest, Message)
@@ -73,8 +73,8 @@ func (a *API) PostGuideByIATA(c *gin.Context) {
 	// Если все прошло хорошо переходим к поиску гайда в БД
 	_, ok, err := a.storage.Guide().GetGuideByIATA(iataUP)
 	if err != nil {
-		a.logger.Info("Проблемы c подключением к БД (таблица guides)")
-		Message := Message{
+		a.logger.Error("Trouble with connecting to DB (table guides):", " ", err)
+		Message := RequestMessage{
 			Message: "Извините, возникли проблемы с доступом к базе данных",
 		}
 		c.JSON(http.StatusInternalServerError, Message)
@@ -83,8 +83,8 @@ func (a *API) PostGuideByIATA(c *gin.Context) {
 
 	// Если гайд был найден
 	if ok {
-		a.logger.Info("Пользователь пытается создать уже существующий гайд")
-		Message := Message{
+		a.logger.Info("User trying to create existed guide")
+		Message := RequestMessage{
 			Message: "Вы пытаетесь создать гайд с уже существующим IATA",
 		}
 		c.JSON(http.StatusBadRequest, Message)
@@ -94,8 +94,8 @@ func (a *API) PostGuideByIATA(c *gin.Context) {
 	// Только после всего этого переходим непосредственно к созданию гайда
 	guideFinal, err := a.storage.Guide().CreateGuide(&guide)
 	if err != nil {
-		a.logger.Info("Проблемы c подключением к БД (таблица guides)")
-		Message := Message{
+		a.logger.Error("Trouble with connecting to DB (table guides):", " ", err)
+		Message := RequestMessage{
 			Message: "Извините, возникли проблемы с доступом к базе данных",
 		}
 		c.JSON(http.StatusInternalServerError, Message)
@@ -103,15 +103,14 @@ func (a *API) PostGuideByIATA(c *gin.Context) {
 	}
 
 	// Если все прошло хорошо
-	guideSlice := make([]*models.Guide, 0, 1)
-	Message := Message{
+	Message := RequestMessage{
 		Message: fmt.Sprintf("Гайд с идентификатором {IATA: %v} успешно добавлен", guideFinal.IATA),
-		Guide:   append(guideSlice, guideFinal),
+		Guide:   guideFinal,
 	}
 	c.JSON(http.StatusCreated, Message)
 
-	a.logger.Info("Инвалидация кэша при добавлении гайда")
+	a.logger.Info("Cache invalidation in PostGuideByIATA")
 	a.cache = a.cache.Delete()
 
-	a.logger.Info("Запрос 'POST: PostGuideByIATA /guide/:iata' успешно выполнен")
+	a.logger.Info("Request 'POST: PostGuideByIATA /guide/:iata' successfully done")
 }
